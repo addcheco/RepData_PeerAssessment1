@@ -3,6 +3,7 @@ title: "Assignment 1 for Reproducible Research!"
 author: "addcheco"
 date: "27/04/2020"
 output: html_document
+keep_md: TRUE
 ---
 
 # Introduction
