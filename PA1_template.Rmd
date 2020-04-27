@@ -1,25 +1,146 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Assignment 1 for Reproducible Research!"
+author: "addcheco"
+date: "27/04/2020"
+output: html_document
 ---
 
+# Introduction
+This assignment took a very long time as it takes a lot of work. I hope you appreciate the work that was put into this document as it was my first time making a markdown file. 
 
-## Loading and preprocessing the data
+This assignment will use activity data from a monitoring device whic hrecorded data every 5 minutes. The data consists of two months (October and November).
+
+# Load the Data 
+The data was loaded directly from the hyperlink in the code chunk. Dataset was inspected with summary and str function but was not displayed here. 
+
+```{r}
+#Load file from url
+if(!file.exists("activity.csv")) {
+  tempfile <- tempfile()
+  download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",destfile = tempfile)
+  unzip(tempfile)
+  unlink(tempfile)
+}
+
+#Load the data and call it dat
+dat <- read.csv("activity.csv")
+newdat <- aggregate(steps~date, data=dat, FUN=sum, na.rm=TRUE) 
+#remove NAs so I can take mean and median
+```
+
+# What is mean total number of steps taken per day?
+## Step 1. Determine Total Steps per Day
+Took the sum of all steps per date in the dataset. Named this 'tab'. 
+```{r}
+tab <- tapply(dat$steps, dat$date, FUN=sum, na.rm=TRUE) 
+```
+
+## Step 2. Histogram
+Let's make a histogram to show distribution of data. 
+```{r}
+hist(tab,main="Histogram showing Steps taken per Day",sub="Data taken from October 1,2012 to November 30, 2012", xlab="Steps per Day", cex.sub=0.5, col=2)
+```
 
 
+## Step 3. Mean and Median 
 
-## What is mean total number of steps taken per day?
+Mean is 10766.19
+Median is 10765
+
+```{r}
+mean_steps <- mean(newdat$steps)
+median_steps <- median(newdat$steps)
+mean_steps <- format(mean_steps, digits=1)
+median_steps <- format(median_steps, digits=1)
+```
 
 
+# What is the average daily activity pattern?
 
-## What is the average daily activity pattern?
+## Step 1. Time Series Plot
+
+Time plot showing total steps per 5 minute intervals.
+```{r}
+tab2 <- aggregate(steps ~ interval, data = dat, FUN=mean, na.rm=TRUE) #create table of steps mean per interval
+plot(tab2$interval,tab2$steps, type= "l", col=2, xlab="Intervals", ylab= "Steps", main= " Number of Steps Averaged per Interval")
+#time series plot 
+```
+
+## Step 2. Maximum number?
+```{r}
+max(tab2$steps)
+```
+
+# Imputing missing values
+
+## Step 1.Calculate total number of missing values in the dataset
+```{r}
+sum(is.na(dat)) #NA in steps column 
+```
+
+## Step 2.Devise a strategy for filling in all of the missing values in the dataset 
+
+I will just replace with mean. 
+
+## Step 3. Create new dataset with the missing data filled in 
+Seperate the datasets into two sets: with NA and without NA. 
+NAs included will be replaced with mean. Merge the two datasets into a new dataset which has missing data filled in. 
+```{r}
+AverageStepsInterval <-tapply(dat$steps, dat$interval, mean, na.rm = TRUE)
+dat2 <- dat[!is.na(dat$steps),] #data with no NAs
+dat3 <- dat[is.na(dat$steps),] #data with NAs
+#replace missing values in dat3
+dat3$steps <- as.factor(dat3$interval)
+  #replace all NA values with the mean
+levels(dat3$steps) <- AverageStepsInterval
+#but now its a vector... I want integer!
+levels(dat3$steps) <- round(as.numeric(levels(dat3$steps)))
+dat3$steps <- as.integer(as.vector(dat3$steps))
+#Now merge the two datasets of Na or no NA together
+TogetherAgain <- rbind(dat3, dat2)
+```
+
+## Step 4. Histogram comparing the two datasets
+
+```{r}
+par(mfrow = c(2,1)) #create figure with two plots side by side
+dat4 <- aggregate(steps ~ date, data = TogetherAgain, FUN = sum, na.rm = TRUE) #set up data for histogram
+hist(dat4$steps, xlab = "Steps per Day", main = "Histogram showing Steps taken per Day (NAs Imputed)", col = 2)
+hist(tab,main="Histogram showing Steps taken per Day (NAs Removed)",sub="Data taken from October 1,2012 to November 30, 2012", xlab="Steps per Day", cex.sub=0.5, col=2)
+```
+
+The mean and median differ slightly. The new mean with NAs replaced is 10765.64 while the median is 10762.
+
+```{r}
+mean(dat4$steps)
+median(dat4$steps)
+mean(tab)
+median(tab)
+```
+
+# Are there differences in activity patterns between weekdays and weekends?
+
+## Step 1. Creating a new variable describing if it is a weekday or weekend 
+```{r}
+library(dplyr)
+library(lubridate)
+TogetherAgain['weektype'] = transmute(TogetherAgain, weektype = ifelse(wday(TogetherAgain$date, label=TRUE)=="Sat"| wday(TogetherAgain$date, label=TRUE)=="Sun", "weekend", "weekday"))
+TogetherAgain$weektype <- as.factor(TogetherAgain$weektype)
+head(TogetherAgain)
+```
+
+## Step 2.Time series plot
+```{r}
+#Time to make table with averages
+steps_interval_dayType <- aggregate(steps~interval + weektype, data= TogetherAgain, FUN=mean)
+head(steps_interval_dayType) # wow interesting table! 
+
+#Let's make a beautiful ggplot because ggplot is beautiful 
+library(ggplot2)
+names(steps_interval_dayType) <- c("interval", "day_type", "mean_steps")
+plot<- ggplot(steps_interval_dayType, aes(interval, mean_steps, color=day_type))
+plot+geom_line(colour=2) + facet_wrap(~day_type, nrow=2, ncol=1)+ labs(y="Steps Average", x="Interval", title="Activity Patterns Based on Type of Day")
+```
 
 
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+Conclusions: After hours of figuring out where my weekend data went, I finally found it. This allowed me to make the concluson that weekends appear to have a later start (the person probably sleeps in). The person also has a spike of steps during the weekdays which is not seen on the weekend which could signify when they go to the gym.  
